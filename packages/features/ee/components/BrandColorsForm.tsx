@@ -26,7 +26,6 @@ const BrandColorsForm = ({
   const brandColorsFormMethods = useFormContext();
   const {
     formState: { isSubmitting: isBrandColorsFormSubmitting, isDirty: isBrandColorsFormDirty },
-    handleSubmit,
   } = brandColorsFormMethods;
 
   const [isCustomBrandColorChecked, setIsCustomBrandColorChecked] = useState(
@@ -67,13 +66,12 @@ const BrandColorsForm = ({
                   defaultValue={brandColor || DEFAULT_LIGHT_BRAND_COLOR}
                   resetDefaultValue={DEFAULT_LIGHT_BRAND_COLOR}
                   onChange={(value) => {
-                    try {
-                      checkWCAGContrastColor("#ffffff", value);
+                    if (checkWCAGContrastColor("#ffffff", value)) {
                       setLightModeError(false);
-                      brandColorsFormMethods.setValue("brandColor", value, { shouldDirty: true });
-                    } catch (err) {
-                      setLightModeError(false);
+                    } else {
+                      setLightModeError(true);
                     }
+                    brandColorsFormMethods.setValue("brandColor", value, { shouldDirty: true });
                   }}
                 />
                 {lightModeError ? (
@@ -96,13 +94,12 @@ const BrandColorsForm = ({
                   defaultValue={darkBrandColor || DEFAULT_DARK_BRAND_COLOR}
                   resetDefaultValue={DEFAULT_DARK_BRAND_COLOR}
                   onChange={(value) => {
-                    try {
-                      checkWCAGContrastColor("#101010", value);
+                    if (checkWCAGContrastColor("#101010", value)) {
                       setDarkModeError(false);
-                      brandColorsFormMethods.setValue("darkBrandColor", value, { shouldDirty: true });
-                    } catch (err) {
+                    } else {
                       setDarkModeError(true);
                     }
+                    brandColorsFormMethods.setValue("darkBrandColor", value, { shouldDirty: true });
                   }}
                 />
                 {darkModeError ? (

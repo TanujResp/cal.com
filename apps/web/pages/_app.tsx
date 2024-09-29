@@ -1,6 +1,6 @@
 import type { IncomingMessage } from "http";
 import type { AppContextType } from "next/dist/shared/lib/utils";
-import React from "react";
+import React, { useEffect } from "react";
 
 import { trpc } from "@calcom/trpc/react";
 
@@ -11,8 +11,15 @@ import "../styles/globals.css";
 function MyApp(props: AppProps) {
   const { Component, pageProps } = props;
 
-  if (Component.PageWrapper !== undefined) return Component.PageWrapper(props);
-  return <Component {...pageProps} />;
+  useEffect(() => {
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/service-worker.js");
+    }
+  }, []);
+
+  const content = Component.PageWrapper ? <Component.PageWrapper {...props} /> : <Component {...pageProps} />;
+
+  return content;
 }
 
 declare global {
@@ -28,6 +35,7 @@ MyApp.getInitialProps = async (ctx: AppContextType) => {
 
   if (req) {
     const { getLocale } = await import("@calcom/features/auth/lib/getLocale");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     newLocale = await getLocale(req as IncomingMessage & { cookies: Record<string, any> });
   } else if (typeof window !== "undefined" && window.calNewLocale) {
     newLocale = window.calNewLocale;

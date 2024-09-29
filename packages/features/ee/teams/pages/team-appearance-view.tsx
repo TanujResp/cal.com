@@ -1,5 +1,7 @@
+"use client";
+
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 
 import BrandColorsForm from "@calcom/features/ee/components/BrandColorsForm";
@@ -15,18 +17,17 @@ import type { RouterOutputs } from "@calcom/trpc/react";
 import { Button, Form, Meta, showToast, SettingsToggle } from "@calcom/ui";
 
 import ThemeLabel from "../../../settings/ThemeLabel";
-import { getLayout } from "../../../settings/layouts/SettingsLayout";
 
 type BrandColorsFormValues = {
   brandColor: string;
   darkBrandColor: string;
 };
 
-type ProfileViewProps = { team: RouterOutputs["viewer"]["teams"]["get"] };
+type ProfileViewProps = { team: RouterOutputs["viewer"]["teams"]["getMinimal"] } & { isAppDir?: boolean };
 
-const ProfileView = ({ team }: ProfileViewProps) => {
+const ProfileView = ({ team, isAppDir }: ProfileViewProps) => {
   const { t } = useLocale();
-  const utils = trpc.useContext();
+  const utils = trpc.useUtils();
 
   const [hideBrandingValue, setHideBrandingValue] = useState(team?.hideBranding ?? false);
   const [hideBookATeamMember, setHideBookATeamMember] = useState(team?.hideBookATeamMember ?? false);
@@ -59,7 +60,10 @@ const ProfileView = ({ team }: ProfileViewProps) => {
       await utils.viewer.teams.get.invalidate();
       if (res) {
         resetTheme({ theme: res.theme });
-        resetBrandColors({ brandColor: res.brandColor, darkBrandColor: res.darkBrandColor });
+        resetBrandColors({
+          brandColor: res.brandColor ?? DEFAULT_LIGHT_BRAND_COLOR,
+          darkBrandColor: res.darkBrandColor ?? DEFAULT_DARK_BRAND_COLOR,
+        });
       }
 
       showToast(t("your_team_updated_successfully"), "success");
@@ -75,11 +79,13 @@ const ProfileView = ({ team }: ProfileViewProps) => {
 
   return (
     <>
-      <Meta
-        title={t("booking_appearance")}
-        description={t("appearance_team_description")}
-        borderInShellHeader={false}
-      />
+      {!isAppDir ? (
+        <Meta
+          title={t("booking_appearance")}
+          description={t("appearance_team_description")}
+          borderInShellHeader={false}
+        />
+      ) : null}
       {isAdmin ? (
         <>
           <Form
@@ -87,7 +93,7 @@ const ProfileView = ({ team }: ProfileViewProps) => {
             handleSubmit={(values) => {
               mutation.mutate({
                 id: team.id,
-                theme: values.theme || null,
+                theme: values.theme === "" ? null : values.theme,
               });
             }}>
             <div className="border-subtle mt-6 flex items-center rounded-t-xl border p-6 text-sm">
@@ -137,8 +143,8 @@ const ProfileView = ({ team }: ProfileViewProps) => {
             }}>
             <BrandColorsForm
               onSubmit={onBrandColorsFormSubmit}
-              brandColor={team?.brandColor}
-              darkBrandColor={team?.darkBrandColor}
+              brandColor={team?.brandColor ?? DEFAULT_LIGHT_BRAND_COLOR}
+              darkBrandColor={team?.darkBrandColor ?? DEFAULT_DARK_BRAND_COLOR}
             />
           </Form>
 
@@ -146,7 +152,7 @@ const ProfileView = ({ team }: ProfileViewProps) => {
             <SettingsToggle
               toggleSwitchAtTheEnd={true}
               title={t("disable_cal_branding", { appName: APP_NAME })}
-              disabled={mutation?.isLoading}
+              disabled={mutation?.isPending}
               description={t("removes_cal_branding", { appName: APP_NAME })}
               checked={hideBrandingValue}
               onCheckedChange={(checked) => {
@@ -158,7 +164,7 @@ const ProfileView = ({ team }: ProfileViewProps) => {
             <SettingsToggle
               toggleSwitchAtTheEnd={true}
               title={t("hide_book_a_team_member")}
-              disabled={mutation?.isLoading}
+              disabled={mutation?.isPending}
               description={t("hide_book_a_team_member_description", { appName: APP_NAME })}
               checked={hideBookATeamMember ?? false}
               onCheckedChange={(checked) => {
@@ -177,31 +183,44 @@ const ProfileView = ({ team }: ProfileViewProps) => {
   );
 };
 
-const ProfileViewWrapper = () => {
+const ProfileViewWrapper = ({ isAppDir }: { isAppDir?: boolean }) => {
   const router = useRouter();
   const params = useParamsWithFallback();
 
   const { t } = useLocale();
 
-  const { data: team, isLoading } = trpc.viewer.teams.get.useQuery(
+  const {
+    data: team,
+    isPending,
+    error,
+  } = trpc.viewer.teams.getMinimal.useQuery(
     { teamId: Number(params.id) },
     {
-      onError: () => {
-        router.push("/settings");
-      },
+      enabled: !!Number(params.id),
     }
   );
 
-  if (isLoading)
+  useEffect(
+    function refactorMeWithoutEffect() {
+      if (error) {
+        router.replace("/teams");
+      }
+    },
+    [error]
+  );
+
+  if (isPending)
     return (
-      <AppearanceSkeletonLoader title={t("appearance")} description={t("appearance_team_description")} />
+      <AppearanceSkeletonLoader
+        isAppDir={isAppDir}
+        title={t("appearance")}
+        description={t("appearance_team_description")}
+      />
     );
 
   if (!team) return null;
 
-  return <ProfileView team={team} />;
+  return <ProfileView team={team} isAppDir={isAppDir} />;
 };
-
-ProfileViewWrapper.getLayout = getLayout;
 
 export default ProfileViewWrapper;

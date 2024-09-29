@@ -1,15 +1,16 @@
 import type { Page } from "@playwright/test";
 import { test as base } from "@playwright/test";
-import type { API } from "mailhog";
-import mailhog from "mailhog";
+// eslint-disable-next-line no-restricted-imports
+import { noop } from "lodash";
 
-import { IS_MAILHOG_ENABLED } from "@calcom/lib/constants";
-import logger from "@calcom/lib/logger";
 import prisma from "@calcom/prisma";
 
 import type { ExpectedUrlDetails } from "../../../../playwright.config";
+import { createAppsFixture } from "../fixtures/apps";
 import { createBookingsFixture } from "../fixtures/bookings";
+import { createEmailsFixture } from "../fixtures/emails";
 import { createEmbedsFixture } from "../fixtures/embeds";
+import { createEventTypeFixture } from "../fixtures/eventTypes";
 import { createFeatureFixture } from "../fixtures/features";
 import { createOrgsFixture } from "../fixtures/orgs";
 import { createPaymentsFixture } from "../fixtures/payments";
@@ -17,6 +18,8 @@ import { createBookingPageFixture } from "../fixtures/regularBookings";
 import { createRoutingFormsFixture } from "../fixtures/routingForms";
 import { createServersFixture } from "../fixtures/servers";
 import { createUsersFixture } from "../fixtures/users";
+import { createWebhookPageFixture } from "../fixtures/webhooks";
+import { createWorkflowPageFixture } from "../fixtures/workflows";
 
 export interface Fixtures {
   page: Page;
@@ -27,10 +30,14 @@ export interface Fixtures {
   embeds: ReturnType<typeof createEmbedsFixture>;
   servers: ReturnType<typeof createServersFixture>;
   prisma: typeof prisma;
-  emails?: API;
+  emails: ReturnType<typeof createEmailsFixture>;
   routingForms: ReturnType<typeof createRoutingFormsFixture>;
   bookingPage: ReturnType<typeof createBookingPageFixture>;
+  workflowPage: ReturnType<typeof createWorkflowPageFixture>;
   features: ReturnType<typeof createFeatureFixture>;
+  eventTypePage: ReturnType<typeof createEventTypeFixture>;
+  appsPage: ReturnType<typeof createAppsFixture>;
+  webhooks: ReturnType<typeof createWebhookPageFixture>;
 }
 
 declare global {
@@ -61,8 +68,8 @@ export const test = base.extend<Fixtures>({
     const usersFixture = createUsersFixture(page, emails, workerInfo);
     await use(usersFixture);
   },
-  bookings: async ({ page }, use) => {
-    const bookingsFixture = createBookingsFixture(page);
+  bookings: async ({ page }, use, workerInfo) => {
+    const bookingsFixture = createBookingsFixture(page, workerInfo);
     await use(bookingsFixture);
   },
   payments: async ({ page }, use) => {
@@ -84,14 +91,7 @@ export const test = base.extend<Fixtures>({
     await use(createRoutingFormsFixture());
   },
   emails: async ({}, use) => {
-    if (IS_MAILHOG_ENABLED) {
-      const mailhogAPI = mailhog();
-      await use(mailhogAPI);
-    } else {
-      //FIXME: Ideally we should error out here. If someone is running tests with mailhog disabled, they should be aware of it
-      logger.warn("Mailhog is not enabled - Skipping Emails verification");
-      await use(undefined);
-    }
+    await use(createEmailsFixture());
   },
   bookingPage: async ({ page }, use) => {
     const bookingPage = createBookingPageFixture(page);
@@ -102,4 +102,25 @@ export const test = base.extend<Fixtures>({
     await features.init();
     await use(features);
   },
+  workflowPage: async ({ page }, use) => {
+    const workflowPage = createWorkflowPageFixture(page);
+    await use(workflowPage);
+  },
+  eventTypePage: async ({ page }, use) => {
+    const eventTypePage = createEventTypeFixture(page);
+    await use(eventTypePage);
+  },
+  appsPage: async ({ page }, use) => {
+    const appsPage = createAppsFixture(page);
+    await use(appsPage);
+  },
+  webhooks: async ({ page }, use) => {
+    const webhooks = createWebhookPageFixture(page);
+    await use(webhooks);
+  },
 });
+
+export function todo(title: string) {
+  // eslint-disable-next-line playwright/no-skipped-test
+  test.skip(title, noop);
+}

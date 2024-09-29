@@ -1,14 +1,24 @@
 import { dir } from "i18next";
+import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import { headers, cookies } from "next/headers";
-import Script from "next/script";
 import React from "react";
 
 import { getLocale } from "@calcom/features/auth/lib/getLocale";
-import { IS_PRODUCTION } from "@calcom/lib/constants";
+import { IconSprites } from "@calcom/ui";
 
 import { prepareRootMetadata } from "@lib/metadata";
 
 import "../styles/globals.css";
+
+const interFont = Inter({ subsets: ["latin"], variable: "--font-inter", preload: true, display: "swap" });
+const calFont = localFont({
+  src: "../fonts/CalSans-SemiBold.woff2",
+  variable: "--font-cal",
+  preload: true,
+  display: "block",
+  weight: "600",
+});
 
 export const generateMetadata = () =>
   prepareRootMetadata({
@@ -59,16 +69,25 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       style={embedColorScheme ? { colorScheme: embedColorScheme as string } : undefined}
       data-nextjs-router="app">
       <head nonce={nonce}>
-        {!IS_PRODUCTION && process.env.VERCEL_ENV === "preview" && (
-          // eslint-disable-next-line @next/next/no-sync-scripts
-          <Script
-            data-project-id="KjpMrKTnXquJVKfeqmjdTffVPf1a6Unw2LZ58iE4"
-            src="https://snippet.meticulous.ai/v1/stagingMeticulousSnippet.js"
+        {!!process.env.NEXT_PUBLIC_HEAD_SCRIPTS && (
+          <script
+            nonce={nonce}
+            id="injected-head-scripts"
+            dangerouslySetInnerHTML={{
+              __html: process.env.NEXT_PUBLIC_HEAD_SCRIPTS,
+            }}
           />
         )}
+        <style>{`
+          :root {
+            --font-inter: ${interFont.style.fontFamily.replace(/\'/g, "")};
+            --font-cal: ${calFont.style.fontFamily.replace(/\'/g, "")};
+          }
+        `}</style>
+        <IconSprites />
       </head>
       <body
-        className="dark:bg-darkgray-50 desktop-transparent bg-subtle antialiased"
+        className="dark:bg-darkgray-50 bg-subtle antialiased"
         style={
           isEmbed
             ? {
@@ -81,6 +100,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               }
             : {}
         }>
+        {!!process.env.NEXT_PUBLIC_BODY_SCRIPTS && (
+          <script
+            nonce={nonce}
+            id="injected-head-scripts"
+            dangerouslySetInnerHTML={{
+              __html: process.env.NEXT_PUBLIC_BODY_SCRIPTS,
+            }}
+          />
+        )}
         {children}
       </body>
     </html>

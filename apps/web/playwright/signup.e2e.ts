@@ -2,17 +2,38 @@ import { expect } from "@playwright/test";
 import { randomBytes } from "crypto";
 
 import { APP_NAME, IS_PREMIUM_USERNAME_ENABLED, IS_MAILHOG_ENABLED } from "@calcom/lib/constants";
+import prisma from "@calcom/prisma";
 
 import { test } from "./lib/fixtures";
-import { getEmailsReceivedByUser } from "./lib/testUtils";
+import { getEmailsReceivedByUser, localize } from "./lib/testUtils";
+import { expectInvitationEmailToBeReceived } from "./team/expects";
 
 test.describe.configure({ mode: "parallel" });
 
-test.describe("Signup Flow Test", async () => {
+test.describe("Signup Main Page Test", async () => {
+  test.beforeEach(async ({ features }) => {
+    features.reset();
+  });
+
+  test("Continue with email button must exist / work", async ({ page }) => {
+    await page.goto("/signup");
+    await expect(page.locator('[data-testid="continue-with-email-button"]')).toBeVisible();
+    await page.locator('[data-testid="continue-with-email-button"]').click();
+  });
+
+  test("Continue with google button must exist / work", async ({ page }) => {
+    await page.goto("/signup");
+    await expect(page.locator('[data-testid="continue-with-google-button"]')).toBeVisible();
+    await page.locator('[data-testid="continue-with-google-button"]').click();
+    await page.waitForURL("/auth/sso/google");
+  });
+});
+
+test.describe("Email Signup Flow Test", async () => {
   test.beforeEach(async ({ features }) => {
     features.reset(); // This resets to the inital state not an empt yarray
   });
-  test.afterAll(async ({ users }) => {
+  test.afterEach(async ({ users }) => {
     await users.deleteAll();
   });
   test("Username is taken", async ({ page, users }) => {
@@ -23,6 +44,10 @@ test.describe("Signup Flow Test", async () => {
       });
 
       await page.goto("/signup");
+      await expect(page.locator("text=Create your account")).toBeVisible();
+      await expect(page.locator('[data-testid="continue-with-email-button"]')).toBeVisible();
+      await page.locator('[data-testid="continue-with-email-button"]').click();
+      await expect(page.locator('[data-testid="signup-submit-button"]')).toBeVisible();
 
       const alertMessage = "Username or email is already taken";
 
@@ -49,6 +74,10 @@ test.describe("Signup Flow Test", async () => {
       });
 
       await page.goto("/signup");
+      await expect(page.locator("text=Create your account")).toBeVisible();
+      await expect(page.locator('[data-testid="continue-with-email-button"]')).toBeVisible();
+      await page.locator('[data-testid="continue-with-email-button"]').click();
+      await expect(page.locator('[data-testid="signup-submit-button"]')).toBeVisible();
 
       const alertMessage = "Username or email is already taken";
 
@@ -79,6 +108,10 @@ test.describe("Signup Flow Test", async () => {
 
     // Signup with premium username name
     await page.goto("/signup");
+    await expect(page.locator("text=Create your account")).toBeVisible();
+    await expect(page.locator('[data-testid="continue-with-email-button"]')).toBeVisible();
+    await page.locator('[data-testid="continue-with-email-button"]').click();
+    await expect(page.locator('[data-testid="signup-submit-button"]')).toBeVisible();
 
     // Fill form
     await page.locator('input[name="username"]').fill("rock");
@@ -101,9 +134,15 @@ test.describe("Signup Flow Test", async () => {
     const userToCreate = users.buildForSignup({
       username: "rick-jones",
       password: "Password99!",
+      // Email intentonally kept as different from username
+      email: `rickjones${Math.random()}-${Date.now()}@example.com`,
     });
 
     await page.goto("/signup");
+    await expect(page.locator("text=Create your account")).toBeVisible();
+    await expect(page.locator('[data-testid="continue-with-email-button"]')).toBeVisible();
+    await page.locator('[data-testid="continue-with-email-button"]').click();
+    await expect(page.locator('[data-testid="signup-submit-button"]')).toBeVisible();
 
     // Fill form
     await page.locator('input[name="username"]').fill(userToCreate.username);
@@ -111,17 +150,21 @@ test.describe("Signup Flow Test", async () => {
     await page.locator('input[name="password"]').fill(userToCreate.password);
 
     await page.click('button[type="submit"]');
-    await page.waitForLoadState("networkidle");
-    // Find the newly created user and add it to the fixture store
-    const newUser = await users.set(userToCreate.email);
-    expect(newUser).not.toBeNull();
+    await page.waitForURL("/auth/verify-email**");
 
     // Check that the URL matches the expected URL
     expect(page.url()).toContain("/auth/verify-email");
+    const dbUser = await prisma.user.findUnique({ where: { email: userToCreate.email } });
+    // Verify that the username is the same as the one provided and isn't accidentally changed to email derived username - That happens only for organization member signup
+    expect(dbUser?.username).toBe(userToCreate.username);
   });
   test("Signup fields prefilled with query params", async ({ page, users }) => {
     const signupUrlWithParams = "/signup?username=rick-jones&email=rick-jones%40example.com";
     await page.goto(signupUrlWithParams);
+    await expect(page.locator("text=Create your account")).toBeVisible();
+    await expect(page.locator('[data-testid="continue-with-email-button"]')).toBeVisible();
+    await page.locator('[data-testid="continue-with-email-button"]').click();
+    await expect(page.locator('[data-testid="signup-submit-button"]')).toBeVisible();
 
     // Fill form
     const usernameInput = page.locator('input[name="username"]');
@@ -170,8 +213,9 @@ test.describe("Signup Flow Test", async () => {
     });
 
     const signupUrlWithToken = `/signup?token=${token}`;
-
     await page.goto(signupUrlWithToken);
+    await expect(page.locator("text=Create your account")).toBeVisible();
+    await expect(page.locator('[data-testid="signup-submit-button"]')).toBeVisible();
 
     const usernameField = page.locator('input[name="username"]');
     const emailField = page.locator('input[name="email"]');
@@ -196,18 +240,25 @@ test.describe("Signup Flow Test", async () => {
       data: { enabled: true },
     });
     const userToCreate = users.buildForSignup({
+      email: users.trackEmail({ username: "email-verify", domain: "example.com" }),
       username: "email-verify",
       password: "Password99!",
     });
 
     await page.goto("/signup");
+    await expect(page.locator("text=Create your account")).toBeVisible();
+    await expect(page.locator('[data-testid="continue-with-email-button"]')).toBeVisible();
+    await page.locator('[data-testid="continue-with-email-button"]').click();
+    await expect(page.locator('[data-testid="signup-submit-button"]')).toBeVisible();
 
     // Fill form
     await page.locator('input[name="username"]').fill(userToCreate.username);
     await page.locator('input[name="email"]').fill(userToCreate.email);
     await page.locator('input[name="password"]').fill(userToCreate.password);
 
-    await page.click('button[type="submit"]');
+    const submitButton = page.locator('button[type="submit"]');
+    await expect(submitButton).toBeEnabled();
+    await submitButton.click();
 
     await page.waitForURL((url) => url.pathname.includes("/auth/verify-email"));
     // Find the newly created user and add it to the fixture store
@@ -227,5 +278,57 @@ test.describe("Signup Flow Test", async () => {
 
     const verifyEmail = receivedEmails?.items[0];
     expect(verifyEmail?.subject).toBe(`${APP_NAME}: Verify your account`);
+  });
+  test("If signup is disabled allow team invites", async ({ browser, page, users, emails }) => {
+    // eslint-disable-next-line playwright/no-skipped-test
+    test.skip(process.env.NEXT_PUBLIC_DISABLE_SIGNUP !== "true", "Skipping due to signup being enabled");
+
+    const t = await localize("en");
+    const teamOwner = await users.create(undefined, { hasTeam: true });
+    const { team } = await teamOwner.getFirstTeamMembership();
+    await teamOwner.apiLogin();
+    await page.goto(`/settings/teams/${team.id}/members`);
+
+    await test.step("Invite User to team", async () => {
+      // TODO: This invite logic should live in a fixture - its used in team and orgs invites (Duplicated from team/org invites)
+      const invitedUserEmail = `rick_${Date.now()}@domain-${Date.now()}.com`;
+      await page.locator(`button:text("${t("add")}")`).click();
+      await page.locator('input[name="inviteUser"]').fill(invitedUserEmail);
+      await page.locator(`button:text("${t("send_invite")}")`).click();
+
+      const inviteLink = await expectInvitationEmailToBeReceived(
+        page,
+        emails,
+        invitedUserEmail,
+        `${team.name}'s admin invited you to join the team ${team.name} on Cal.com`,
+        "signup?token"
+      );
+
+      //Check newly invited member exists and is pending
+      await expect(
+        page.locator(`[data-testid="email-${invitedUserEmail.replace("@", "")}-pending"]`)
+      ).toHaveCount(1);
+
+      // eslint-disable-next-line playwright/no-conditional-in-test
+      if (!inviteLink) return;
+
+      // Follow invite link to new window
+      const context = await browser.newContext();
+      const newPage = await context.newPage();
+      await newPage.goto(inviteLink);
+      await expect(newPage.locator("text=Create your account")).toBeVisible();
+
+      const url = new URL(newPage.url());
+      expect(url.pathname).toBe("/signup");
+      await expect(page.locator('[data-testid="continue-with-email-button"]')).toBeVisible();
+      await page.locator('[data-testid="continue-with-email-button"]').click();
+      await expect(page.locator('[data-testid="signup-submit-button"]')).toBeVisible();
+      // Check required fields
+      await newPage.locator("input[name=password]").fill(`P4ssw0rd!`);
+      await newPage.locator("button[type=submit]").click();
+      await newPage.waitForURL("/getting-started?from=signup");
+      await newPage.close();
+      await context.close();
+    });
   });
 });

@@ -1,41 +1,13 @@
-import { Fragment } from "react";
-
 import { getLayout } from "@calcom/features/settings/layouts/SettingsLayout";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
-import { Button, Meta, SkeletonButton, SkeletonContainer, SkeletonText } from "@calcom/ui";
-import { Plus } from "@calcom/ui/components/icon";
+import { Meta } from "@calcom/ui";
 
 import PageWrapper from "@components/PageWrapper";
 import { CalendarListContainer } from "@components/apps/CalendarListContainer";
 
-const SkeletonLoader = () => {
-  return (
-    <SkeletonContainer>
-      <div className="border-subtle mt-8 space-y-6 rounded-lg border px-4 py-6 sm:px-6">
-        <SkeletonText className="h-8 w-full" />
-        <SkeletonText className="h-8 w-full" />
-        <SkeletonText className="h-8 w-full" />
-        <SkeletonText className="h-8 w-full" />
+import AddCalendarButton from "~/settings/my-account/components/AddCalendarButton";
 
-        <SkeletonButton className="ml-auto h-8 w-20 rounded-md p-5" />
-      </div>
-    </SkeletonContainer>
-  );
-};
-
-const AddCalendarButton = () => {
-  const { t } = useLocale();
-
-  return (
-    <>
-      <Button color="secondary" StartIcon={Plus} href="/apps/categories/calendar">
-        {t("add_calendar")}
-      </Button>
-    </>
-  );
-};
-
-const CalendarsView = () => {
+const Page = () => {
   const { t } = useLocale();
 
   return (
@@ -53,7 +25,7 @@ const CalendarsView = () => {
   );
 };
 
-CalendarsView.getLayout = getLayout;
-CalendarsView.PageWrapper = PageWrapper;
+Page.getLayout = getLayout;
+Page.PageWrapper = PageWrapper;
 
-export default CalendarsView;
+export default Page;

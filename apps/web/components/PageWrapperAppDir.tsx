@@ -2,35 +2,18 @@
 
 import { type DehydratedState } from "@tanstack/react-query";
 import type { SSRConfig } from "next-i18next";
-import { Inter } from "next/font/google";
-import localFont from "next/font/local";
 // import I18nLanguageHandler from "@components/I18nLanguageHandler";
 import { usePathname } from "next/navigation";
 import Script from "next/script";
-import type { ReactNode } from "react";
 
 import "@calcom/embed-core/src/embed-iframe";
 import LicenseRequired from "@calcom/features/ee/common/components/LicenseRequired";
 
-import type { AppProps } from "@lib/app-providers-app-dir";
 import AppProviders from "@lib/app-providers-app-dir";
 
-export interface CalPageWrapper {
-  (props?: AppProps): JSX.Element;
-  PageWrapper?: AppProps["Component"]["PageWrapper"];
-}
-
-const interFont = Inter({ subsets: ["latin"], variable: "--font-inter", preload: true, display: "swap" });
-const calFont = localFont({
-  src: "../fonts/CalSans-SemiBold.woff2",
-  variable: "--font-cal",
-  preload: true,
-  display: "swap",
-});
-
 export type PageWrapperProps = Readonly<{
-  getLayout: ((page: React.ReactElement) => ReactNode) | null;
-  children: React.ReactElement;
+  getLayout?: ((page: React.ReactElement) => React.ReactNode) | null;
+  children: React.ReactNode;
   requiresLicense: boolean;
   nonce: string | undefined;
   themeBasis: string | null;
@@ -60,7 +43,7 @@ function PageWrapper(props: PageWrapperProps) {
     nonce,
   };
 
-  const getLayout: (page: React.ReactElement) => ReactNode = props.getLayout ?? ((page) => page);
+  const getLayout: (page: React.ReactElement) => React.ReactNode = props.getLayout ?? ((page) => page);
 
   return (
     <AppProviders {...providerProps}>
@@ -71,15 +54,8 @@ function PageWrapper(props: PageWrapperProps) {
           id="page-status"
           dangerouslySetInnerHTML={{ __html: `window.CalComPageStatus = '${pageStatus}'` }}
         />
-        <style jsx global>{`
-          :root {
-            --font-inter: ${interFont.style.fontFamily};
-            --font-cal: ${calFont.style.fontFamily};
-          }
-        `}</style>
-
         {getLayout(
-          props.requiresLicense ? <LicenseRequired>{props.children}</LicenseRequired> : props.children
+          props.requiresLicense ? <LicenseRequired>{props.children}</LicenseRequired> : <>{props.children}</>
         )}
       </>
     </AppProviders>

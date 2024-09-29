@@ -4,37 +4,9 @@ import { trpc } from "app/_trpc/client";
 import { useState } from "react";
 import superjson from "superjson";
 
-import { httpBatchLink } from "@calcom/trpc/client/links/httpBatchLink";
-import { httpLink } from "@calcom/trpc/client/links/httpLink";
-import { loggerLink } from "@calcom/trpc/client/links/loggerLink";
-import { splitLink } from "@calcom/trpc/client/links/splitLink";
+import { httpBatchLink, httpLink, loggerLink, splitLink } from "@calcom/trpc/client";
+import { ENDPOINTS } from "@calcom/trpc/react/shared";
 
-const ENDPOINTS = [
-  "admin",
-  "apiKeys",
-  "appRoutingForms",
-  "apps",
-  "auth",
-  "availability",
-  "appBasecamp3",
-  "bookings",
-  "deploymentSetup",
-  "eventTypes",
-  "features",
-  "insights",
-  "payments",
-  "public",
-  "saml",
-  "slots",
-  "teams",
-  "organizations",
-  "users",
-  "viewer",
-  "webhook",
-  "workflows",
-  "appsRouter",
-  "googleWorkspace",
-] as const;
 export type Endpoint = (typeof ENDPOINTS)[number];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -83,7 +55,9 @@ export const TrpcProvider: React.FC<{ children: React.ReactNode; dehydratedState
         // adds pretty logs to your console in development and logs errors in production
         loggerLink({
           enabled: (opts) =>
-            !!process.env.NEXT_PUBLIC_DEBUG || (opts.direction === "down" && opts.result instanceof Error),
+            (typeof process.env.NEXT_PUBLIC_LOGGER_LEVEL === "number" &&
+              process.env.NEXT_PUBLIC_LOGGER_LEVEL >= 0) ||
+            (opts.direction === "down" && opts.result instanceof Error),
         }),
         splitLink({
           // check for context property `skipBatch`
